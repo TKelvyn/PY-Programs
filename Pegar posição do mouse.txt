@@ -1,0 +1,12 @@
+import pyautogui
+import time
+
+def get_mouse_position():
+    time.sleep(5)
+    x, y = pyautogui.position()
+    return x, y
+
+
+# Exibe a posição do mouse
+x, y = get_mouse_position()
+print(f"Posição atual do mouse: X={x}, Y={y}")

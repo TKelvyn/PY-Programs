@@ -1,0 +1,215 @@
+import os
+import shutil
+from bs4 import BeautifulSoup
+from selenium.webdriver.chrome.options import Options
+import pandas as pd
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from datetime import datetime
+import chromedriver_autoinstaller
+from selenium.webdriver.common.action_chains import ActionChains
+import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import smtplib
+import os
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+
+
+mes_atual = (datetime.now().strftime("%m"))
+mes_atual = int(mes_atual )
+menus = ["Por necessidade","Por LeadTime","Sol de compras"]
+
+
+
+def bi(valor, nome_menu):
+
+    dir_final =  os.path.join(r"C:\Users\tharl\Downloads\ENC\BI")
+    
+    temp_download_dir = os.path.join(r"C:\Users\tharl\Downloads\ENC\BI", f"temp_{nome_menu}")
+    if not os.path.exists(temp_download_dir):
+        os.makedirs(temp_download_dir)
+
+    chromedriver_autoinstaller.install()
+
+    chrome_options = Options()
+    
+    prefs = {
+        "download.default_directory": temp_download_dir,  
+        "download.prompt_for_download": False,  
+        "download.directory_upgrade": True,     
+        "safebrowsing.enabled": True
+    }
+    chrome_options.add_experimental_option("prefs", prefs)
+
+    navegador = webdriver.Chrome(options=chrome_options)
+
+    wait = WebDriverWait(navegador, 5)
+
+    navegador.get("https://app.powerbi.com/groups/me/reports/2b6c3d3c-fc82-4620-969d-a975e2bf7257/ReportSection39fdf24372cae0346c8b?ctid=8d5300e7-1cf8-4189-a97f-676c975443a7&experience=power-bi")
+
+    wait.until(EC.element_to_be_clickable((By.ID, "email"))).send_keys("tharlys.santos@tagus-tec.com.br", Keys.RETURN)
+    wait.until(EC.element_to_be_clickable((By.ID, "i0118"))).send_keys("Dimep*2023@", Keys.RETURN)
+    wait.until(EC.element_to_be_clickable((By.ID, "idSIButton9"))).send_keys(Keys.RETURN)
+    time.sleep(3)  
+
+    menus = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, "mat-list-item-content")))
+    menu = menus[valor]
+    menu.click()
+
+    time.sleep(3)  
+    dropdown_item = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[@class='slicer-dropdown-menu' and @aria-label='Mês']")))
+
+    dropdown_item.click()
+    
+    slicer_checkboxes = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, "slicerText")))
+
+    if mes_atual > 6:
+        for index, checkbox in enumerate(slicer_checkboxes[7:12], start=1): 
+            navegador.execute_script("arguments[0].scrollIntoView();", checkbox)  
+            ActionChains(navegador).move_to_element(checkbox).perform()
+            time.sleep(2)  
+        
+        dropdown_item = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[@class='slicer-dropdown-menu' and @aria-label='Mês']")))
+
+        dropdown_item.click()
+        time.sleep(2)  
+        dropdown_item = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[@class='slicer-dropdown-menu' and @aria-label='Mês']")))
+
+        dropdown_item.click()
+
+        slicer_checkboxes = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, "slicerText")))
+
+        for index, checkbox in enumerate(slicer_checkboxes[0:7], start=6):  
+            if mes_atual >= index:
+                navegador.execute_script("arguments[0].scrollIntoView();", checkbox)  
+                ActionChains(navegador).move_to_element(checkbox).click().perform() 
+
+    else:
+        slicer_checkboxes[mes_atual].click()
+    
+    dropdown_item.click()
+
+    elemento_para_capturar = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "displayAreaViewport")))
+
+    screenshot_path = os.path.join(dir_final, f"{nome_menu}.png")
+    elemento_para_capturar.screenshot(screenshot_path)
+    print(f"Screenshot salvo em: {screenshot_path}")
+
+    elementos = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, "pivotTableCellWrap.cell-interactive.tablixAlignRight.main-cell")))
+
+    maior_valor = float('-inf')
+    elemento_maior_valor = None
+
+    for elemento in elementos:
+        try:
+            valor = float(elemento.text)  
+            if valor > maior_valor:
+                maior_valor = valor
+                elemento_maior_valor = elemento
+        except ValueError:
+            continue 
+
+    if elemento_maior_valor:
+        print(f"Elemento com maior valor: {maior_valor}, Texto: {elemento_maior_valor.text}")
+
+        wait.until(EC.visibility_of(elemento_maior_valor))
+        
+        actions = ActionChains(navegador)
+        actions.move_to_element(elemento_maior_valor).context_click().perform() 
+        time.sleep(0.5)
+        
+
+        botoes = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, "pbi-menu-item-text-container")))
+        if botoes:
+            botoes[0].click()
+        else:
+            print("Nenhum botão encontrado no menu.")
+
+    time.sleep(2) 
+
+    wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "vcMenuBtn"))).click()
+
+    time.sleep(2) 
+
+    exportar_dados = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[@class='pbi-menu-item ng-star-inserted' and @aria-label='Exportar dados']")))
+
+    exportar_dados.click()
+
+    time.sleep(2) 
+
+    wait.until(EC.element_to_be_clickable((By.ID, "okButton"))).send_keys(Keys.RETURN)
+
+    time.sleep(5)
+
+    arquivo_baixado = max([f for f in os.listdir(temp_download_dir)], key=lambda xa: os.path.getctime(os.path.join(temp_download_dir, xa)))
+    
+    novo_nome = os.path.join(temp_download_dir, f"{nome_menu}.xlsx")
+    os.rename(os.path.join(temp_download_dir, arquivo_baixado), novo_nome)
+    print(f"Arquivo renomeado para: {novo_nome}")
+    
+    destino_final = os.path.join(r"C:\Users\tharl\Downloads\ENC\BI", f"{nome_menu}.xlsx")
+    shutil.move(novo_nome, destino_final)
+    print(f"Arquivo movido para: {destino_final}")
+    
+    time.sleep(2)
+
+    navegador.quit()
+
+    shutil.rmtree(temp_download_dir) 
+
+    
+max_concurrent_browsers = 5
+
+with ThreadPoolExecutor(max_workers=max_concurrent_browsers) as executor:
+    futures = [executor.submit(bi, index, menus[index]) for index in range(len(menus))]
+
+    for future in as_completed(futures):
+        try:
+            result = future.result()
+            print("Processamento concluído.")
+        except Exception as e:
+            print(f"Erro ao processar: {str(e)}")
+    
+
+    email = "bi.oficial@csgd.com.br"
+    senha = "mpdx usij apim fmja"
+    Para = "tkelvyn123@gmail.com"
+
+    pasta_anexos = r"C:\Users\tharl\Downloads\ENC\BI"
+
+    msg = MIMEMultipart()
+    msg['From'] = email
+    msg['To'] = Para
+    msg['Subject'] = "Arquivos anexados"
+
+    corpo_email = "Segue em anexo os arquivos de BI da semana.."
+    msg.attach(MIMEText(corpo_email, 'plain'))
+
+    for arquivo in os.listdir(pasta_anexos):
+        caminho_arquivo = os.path.join(pasta_anexos, arquivo)
+        
+        if os.path.isfile(caminho_arquivo):  
+            anexo = MIMEBase('application', 'octet-stream')
+            with open(caminho_arquivo, 'rb') as f:
+                anexo.set_payload(f.read())
+            
+            encoders.encode_base64(anexo)
+            anexo.add_header('Content-Disposition', f'attachment; filename={arquivo}')
+            msg.attach(anexo)
+
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()  
+        server.login(email, senha)
+        server.sendmail(email, Para, msg.as_string())
+        server.quit()
+        print("E-mail enviado com sucesso!")
+    except Exception as e:
+        print(f"Erro ao enviar e-mail: {e}")

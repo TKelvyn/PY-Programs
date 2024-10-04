@@ -1,0 +1,184 @@
+import os
+import shutil
+import datetime
+import textwrap
+import PyPDF2
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import landscape, letter
+from cryptography.hazmat.primitives import hashes
+from datetime import datetime
+
+# Dicionário com os assinantes de acordo com o prefixo dos arquivos
+assinantes_por_prefixo = {
+    'ah': {
+        'assinante1': "MARCELO DOS SANTOS ROCHA",
+        'cpf1': "***.123.456-**",
+        'assinante2': "DIMAS DE MELO PIMENTA II",
+        'cpf2': "***.436.418-**"
+    },
+    'as': {
+        'assinante1': "CLAUDIO FRANCISCO RODRIGUES MARTINS",
+        'cpf1': "***.559.478-**",
+        'assinante2': "DIMAS DE MELO PIMENTA II",
+        'cpf2': "***.374.738-**"
+    }
+}
+
+def gerar_hash(documento):
+    """Função para gerar o hash do documento"""
+    with open(documento, 'rb') as file:
+        mensagem = file.read()
+        digest = hashes.Hash(hashes.SHA256())
+        digest.update(mensagem)
+        return digest.finalize().hex()
+
+
+def criar_manifesto(documento, assinante1, cpf1, assinante2, cpf2):
+    """Cria o manifesto de assinatura"""
+    hash_documento = gerar_hash(documento)
+    data_hora_assinatura = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+
+    manifesto = f"""    Manifesto de Assinatura
+
+    Esse documento foi assinado pelos seguintes signatários nas datas indicadas (Fusohorário de Brasília):
+
+    Hash do Documento: {hash_documento}
+
+    Assinantes: {assinante1} (CPF: {cpf1}) em {data_hora_assinatura} e 
+    {assinante2} (CPF: {cpf2}) em {data_hora_assinatura}
+    """
+    return manifesto
+
+
+def adicionar_assinatura_rodape(pdf_writer, documento, manifesto_texto1, manifesto_texto2, texto_fim):
+    """Adiciona assinatura no rodapé de cada página do PDF"""
+    with open(documento, 'rb') as file:
+        pdf_reader = PyPDF2.PdfReader(file)
+        for page_number in range(len(pdf_reader.pages)):
+            page = pdf_reader.pages[page_number]
+
+            # Cria um canvas temporário para adicionar a assinatura no rodapé
+            rodape_pdf = canvas.Canvas("rodape_temp.pdf", pagesize=letter)
+            rodape_pdf.setFont("Helvetica", 7)
+
+            # Quebrar o manifesto_texto em várias linhas
+            linhas_texto1 = manifesto_texto1.split("\n")
+            y_pos = 50
+            for linha in linhas_texto1:
+                rodape_pdf.drawString(50, y_pos, linha)
+                y_pos -= 6
+            
+            linhas_texto2 = manifesto_texto2.split("\n")
+            y_pos = 50
+            for linha in linhas_texto2:
+                rodape_pdf.drawString(300, y_pos, linha)
+                y_pos -= 6
+
+            linhas_fim = texto_fim.split("\n")
+            y_pos = 20 
+            for linha in linhas_fim:
+                rodape_pdf.drawString(50, y_pos, linha)
+                y_pos -= 6
+
+            rodape_pdf.save()
+
+            # Abre o rodapé como um arquivo PDF e mescla na página original
+            with open("rodape_temp.pdf", 'rb') as rodape_file:
+                rodape_pdf_reader = PyPDF2.PdfReader(rodape_file)
+                rodape_page = rodape_pdf_reader.pages[0]
+
+                # Mescla o rodapé na página original
+                page.merge_page(rodape_page)
+                pdf_writer.add_page(page)
+
+
+def criar_pagina_manifesto(manifesto, output_path):
+    """Cria um arquivo PDF com a página de manifesto"""
+    c = canvas.Canvas(output_path, pagesize=landscape(letter))
+    width, height = landscape(letter)
+
+    # Adiciona o manifesto com quebras de linha
+    lines = manifesto.split('\n')
+    y = height - 50
+    for line in lines:
+        c.drawString(50, y, line)
+        y -= 15  # Ajuste a altura entre as linhas conforme necessário
+
+    c.save()
+
+
+def anexar_manifesto_pdf(documento, manifesto, assinante1, cpf1, assinante2, cpf2):
+    """Anexa o manifesto ao documento PDF original"""
+    data_hora_assinatura = datetime.now().strftime('%d/%m/%Y %H:%M')
+    manifesto_pdf = "manifesto_temp.pdf"
+    criar_pagina_manifesto(manifesto, manifesto_pdf)
+
+    # Cria um PdfWriter para gerar o novo documento
+    pdf_writer = PyPDF2.PdfWriter()
+    texto1 = f"""
+    Assinado por: {assinante1} 
+    CPF: {cpf1}
+    Certificado emitido por: AC Instituto Fenacon RFB G3
+    Data:{data_hora_assinatura}
+    """
+    texto2 = f"""
+    Assinado por: {assinante2} 
+    CPF: {cpf2}
+    Certificado emitido por: AC Instituto Fenacon RFB G3
+    Data:{data_hora_assinatura}
+    """
+    rodape_fim = f"""
+    Esse documento foi assinado por {assinante1} e {assinante2}
+    """
+
+    # Adiciona o rodapé com as duas assinaturas
+    adicionar_assinatura_rodape(pdf_writer, documento, texto1, texto2, rodape_fim)
+
+    # Lê o manifesto e o PDF original, e mescla no novo PDF
+    with open(manifesto_pdf, 'rb') as manifesto_file:
+        manifesto_reader = PyPDF2.PdfReader(manifesto_file)
+        pdf_writer.add_page(manifesto_reader.pages[0])
+
+    # Salva o novo documento
+    novo_documento = documento.replace('.pdf', '_assinado.pdf')
+    with open(novo_documento, 'wb') as file:
+        pdf_writer.write(file)
+
+    return novo_documento
+
+
+# Exemplo de uso
+documento_para_assinar = 'C:/Users/tharl/Downloads/ENC/Assinatura/Claudio'
+
+# Pasta para salvar os documentos assinados e originais
+pasta_assinados = os.path.join(documento_para_assinar, 'assinados')
+os.makedirs(pasta_assinados, exist_ok=True)
+
+for arquivo in os.listdir(documento_para_assinar):
+    if arquivo.endswith('.pdf') and not arquivo.endswith('assinado.pdf'):
+        prefixo = arquivo[:2].lower()  # Pega os primeiros dois caracteres do nome do arquivo
+
+        if prefixo in assinantes_por_prefixo:
+            # Obtém os dados dos assinantes conforme o prefixo
+            assinante1 = assinantes_por_prefixo[prefixo]['assinante1']
+            cpf1 = assinantes_por_prefixo[prefixo]['cpf1']
+            assinante2 = assinantes_por_prefixo[prefixo]['assinante2']
+            cpf2 = assinantes_por_prefixo[prefixo]['cpf2']
+
+            caminho_arquivo = os.path.join(documento_para_assinar, arquivo)
+
+            manifesto = criar_manifesto(caminho_arquivo, assinante1, cpf1, assinante2, cpf2)
+
+            novo_documento = anexar_manifesto_pdf(caminho_arquivo, manifesto, assinante1, cpf1, assinante2, cpf2)
+
+            novo_caminho_original = os.path.join(pasta_assinados, os.path.basename(caminho_arquivo))
+            novo_caminho_assinado = os.path.join(pasta_assinados, os.path.basename(novo_documento))
+
+            shutil.move(caminho_arquivo, novo_caminho_original)
+            shutil.move(novo_documento, novo_caminho_assinado)
+
+            print(f"Documentos movidos para a pasta 'assinados': {novo_caminho_original} e {novo_caminho_assinado}")
+        else:
+            print(f"Prefixo não reconhecido para o arquivo: {arquivo}. Documento ignorado.")
+
+print("Processo de assinatura concluído.")

@@ -1,0 +1,13 @@
+from pywinauto import Desktop
+
+# Usando o backend UIA (recomendado para aplicações mais novas)
+desktop = Desktop(backend='uia')
+
+# Obtém a lista de janelas abertas na área de trabalho
+janelas_abertas = desktop.windows()
+
+# Itera sobre as janelas e imprime informações de cada uma
+for janela in janelas_abertas:
+    print(f"Título: {janela.window_text()}")
+    print(f"Classe: {janela.class_name()}")
+    print('-' * 50)

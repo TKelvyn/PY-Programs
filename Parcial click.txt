@@ -1,0 +1,49 @@
+from pywinauto import Application
+import time
+import pyautogui
+
+# Função para tentar conectar a uma janela
+def conectar_a_janela(app, nomes_janelas):
+    for nome in nomes_janelas:
+        try:
+            janela = app.window(best_match=nome)
+            janela.wait('visible', timeout=5)
+            return janela
+        except Exception as e:
+            print(f"Janela '{nome}' não encontrada ou não está visível. Tentando próximo...")
+    return None
+
+nomes_janelas = ["TOTVS Manufatura (TOTVS) 02.9.0099 - Ver: 20.3.2.7", ".*smartclient.*"]
+nova_janela = conectar_a_janela(app, nomes_janelas)
+
+if nova_janela:
+    print(f"Conectado à janela: {nova_janela.window_text()}")
+
+    # Ativa a janela para garantir que está em foco
+    nova_janela.set_focus()
+
+    pyautogui.moveTo(70, 460)
+
+    pyautogui.click()
+
+    botoes = nova_janela.descendants(control_type="Button")
+    for botao in botoes:
+        print(f"Botão encontrado: {botao.window_text()}")
+
+        # Tenta clicar em um botão específico
+        try:
+            botao = nova_janela.child_window(control_type="Button", found_index=3)
+            print(botao)
+            botao.click()
+        except Exception as e:
+            print(f"Erro ao clicar no botão: {e}")
+
+        # Itera sobre os controles filhos
+        for child in nova_janela.children():
+            print(child.window_text())
+            if "Atualizações" in child.window_text():
+                child.click()
+                break
+
+    else:
+        print("Nenhuma janela correspondente encontrada.")

@@ -1,0 +1,37 @@
+import os
+import shutil
+
+# Caminho da pasta de origem
+pasta_origem = 'C:/Users/tharl/Downloads/ENC/Assinatura/Claudio/assinados'
+
+# Caminhos das pastas de destino
+pasta_hardware = 'C:/Users/tharl/Downloads/ENC/Assinatura/Claudio/hardware'
+pasta_software = 'C:/Users/tharl/Downloads/ENC/Assinatura/Claudio/software'
+
+# Cria as pastas de destino se não existirem
+os.makedirs(pasta_hardware, exist_ok=True)
+os.makedirs(pasta_software, exist_ok=True)
+
+# Percorre todos os arquivos na pasta de origem
+for arquivo in os.listdir(pasta_origem):
+    # Verifica se é um arquivo PDF
+    if arquivo.lower().endswith('.pdf'):
+        caminho_arquivo = os.path.join(pasta_origem, arquivo)
+        # Verifica as duas primeiras letras do nome do arquivo (sem extensão)
+        prefixo = arquivo[:2].lower()
+        prefixofim = arquivo[-12:].lower()
+
+
+        # Separa para as pastas correspondentes
+        if prefixo == 'ah':
+            destino = os.path.join(pasta_hardware, arquivo)
+            if prefixofim == "assinado.pdf":
+                shutil.move(caminho_arquivo, destino)
+                print(f'Movido para Hardware: {arquivo}')
+        elif prefixo == 'as':
+            destino = os.path.join(pasta_software, arquivo)
+            if prefixofim == "assinado.pdf":
+                shutil.move(caminho_arquivo, destino)
+                print(f'Movido para Software: {arquivo}')
+    else:
+        print("Nenhum arquivo para assinar!")
